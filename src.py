@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import openai
 import pinecone
 import streamlit as st
 import time
