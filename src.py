@@ -27,10 +27,10 @@ if index_name not in pinecone.list_indexes():
     )
 st.session_state_index = pinecone.Index(index_name)
 
-openai.api_key=st.secrets['openai_api_key']
+openai_api_key=st.secrets['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']
 
 
-df_index=pd.read_csv('only_verses.csv')
+df_index=pd.read_csv('Data.csv')
 
 st.write("""
 # GitaGPT
