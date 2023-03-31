@@ -1,11 +1,9 @@
-import pandas as pd
-import numpy as np
-import openai
-import pinecone
 import streamlit as st
-import secrets as secrets
-import time
 import os
+import openai
+#from streamlit_chat import message
+from PIL import Image
+import time
 import toml
 
 secrets = toml.load('secrets.toml')
@@ -15,126 +13,114 @@ with open('secrets.toml', 'r') as f:
 
 # Get the OpenAI and Pinecone API keys from the secrets dictionary
 openai_api_key = secrets['openai']['openai_api_key']
-pinecone_api_key = secrets['pinecone']['pinecone_api_key']
 
-pinecone.init(api_key=pinecone_api_key, environment='us-west4-gcp')
+txtInputQuestion = "userQuestion"
+pageTitle = "HOLY-GPT"
 
 openai.api_key = openai_api_key
 
 
 
-index_name = 'holygpt'
 
-if index_name not in pinecone.list_indexes():
-    # if does not exist, create index
-    pinecone.create_index(
-        index_name,
-        dimension=1536,
-        metric='cosine'
-    )
-st.session_state_index = pinecone.Index(index_name)
+def clear_text(textInput):
+
+    st.session_state[textInput] = ""
 
 
-
-
-df_index=pd.read_csv('only_verses.csv')
-
-st.write("""
-# GitaGPT
-""")
-
-
-st.write('''If you could ask Bhagavad Gita a question, what would it be?''')
-st.markdown('\n')
-st.markdown('\n')
-def get_embedding(text, model="text-embedding-ada-002"):
-   text = text.replace("\n", " ")
-   return openai.Embedding.create(input = [text], model=model)['data'][0]['embedding']
-
-def vector_similarity(x, y):
-    """
-    Returns the similarity between two vectors.
-    Because OpenAI Embeddings are normalized to length 1, the cosine similarity is the same as the dot product.
-    """
-    return np.dot(np.array(x), np.array(y))
-
-def card(context):
-    return st.markdown(context)
-
-COMPLETIONS_API_PARAMS = {
-    "temperature": 0.0,
-    "max_tokens": 300,
-    "model": 'text-davinci-003',
-}
-
-header = """You are Krishna from Mahabharata, and you're here to selflessly help and answer any question or dilemma of anyone who comes to you.
-    Analyze the person's question below and identify the base emotion and the root for this emotion, and then frame your answer by summarizing how your verses below
-    apply to their situation and be emphatetic in your answer."""
-
-
-
-def print_verse(q,retries=6):
-    k=[]
-    embed = get_embedding(q)
-    for j in range(retries):
-            try:
-                for i in range(5):
-                    k.append(int(st.session_state_index.query(embed, top_k=5)['matches'][i]['id']))
-                return k    
-            except Exception as e:
-                if j == retries - 1:
-                    raise e(st.markdown('Maximum number of retries exceeded'))
-                else:
-                    st.markdown("Failed to generate, trying again.")
-                    time.sleep(2 ** j)
-                    continue
-
-def return_all_verses(retries=6):
-    versee = []
-    for j in range(retries):
-        try:
-            for i in verse_numbers:
-                versee.append(f"{df_index['index'][i]} \n")
-            return versee
-        except Exception as e:
-            if j == retries - 1:
-                raise e(st.markdown('Maximum number of retries exceeded'))
-            else:
-                st.markdown("Failed to generate, trying again.")
-                time.sleep(2 ** j)
-                continue
-               
-
-question=st.text_input("**How are you feeling? Ask a question or describe your situation below, and then press Enter.**",'',placeholder='Type your question here')
-# if st.button('Enter'):
-if question != '':
-    output = st.empty()
-    st.write('Bhagvad Gita says: ') 
-    verse_numbers = print_verse(question)
-    verses = return_all_verses()
-    verse_strings = "".join(return_all_verses())
-    prompt = f'''{header}\nQuestion:{question}\nVerses:\n{verse_strings}\nAnswer:\n'''
-
+def generate_response_davinci(question):
     response = openai.Completion.create(
-        prompt = prompt,
-        **COMPLETIONS_API_PARAMS
+        model="text-davinci-003",
+        prompt=generate_prompt(question),
+        temperature=0.6,
+        max_tokens=2048
     )
-    # llm = OpenAI(streaming=True, callback_manager=CallbackManager([StreamingStdOutCallbackHandler()]), verbose=True, temperature=0)
-    # resp = llm(prompt)
-    # st.markdown(resp)
-    # output.markdown(resp)
-    st.markdown(response["choices"][0]["text"].strip(" \n"))
-    st.markdown('\n\n')
-    st.markdown("Relevant verses:")
-    st.markdown(verse_strings.replace('\n','\n\n'))
+    return response.choices[0].text
 
 
-st.write('''\n\n Here's some examples of what you can ask:
-1. I've worked very hard but I'm still not able to achieve the results I hoped for, what do I do?
-2. I made a million dollars manipulating the stock market and I'm feeling great.
-3. How can I attain a peace of mind?
-''')
 
-st.write('\n\n\n\n\n\n\n')
+def generate_prompt(question):
+     prompt = f"I am here to help you. What is your question or problem? {question}"
+     return prompt
 
-st.write('''Note: This is an AI model trained on Bhagvad Gita and it generates responses from that perspective.''')
+def generate_chat_response(prompt):
+    response = openai.Completion.create(
+        engine="davinci",
+        prompt=prompt,
+        max_tokens=1024,
+        temperature=0.7,
+        n=1,
+        stop=None,
+        timeout=20,
+    )
+    return response.choices[0].text.strip()
+   
+def generate_response_chatgpt(question):
+    response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+            {"role": "user", "content": generate_prompt(question)}
+        ]
+        )
+    return response['choices'][0]['message']['content']
+
+def message(response):
+    if response and response.choices and response.choices[0].text:
+        return response.choices[0].text.strip()
+    else:
+        return "Sorry, I couldn't understand you. Can you please try again?"
+def get_text():
+    input_text = st.text_input("*How are you feeling? Ask a question or describe your situation below, and then press Enter.*",placeholder="Type Your question here.", key=txtInputQuestion)
+    return input_text
+
+def page_setup(title, icon):
+    st.set_page_config(
+        page_title=title,
+        page_icon=icon,
+        layout='centered',
+        initial_sidebar_state='auto',
+        menu_items={
+            'About': 'About your application: **This is Bhagvad Gita GPT, a simple ChatGPT use case demo to show how one can easily leverage openAI APIs to create intelligent conversational experiences related to a specific topic.**'
+        }
+    )
+    st.sidebar.title('Creators :')
+    st.sidebar.markdown('Priyal Khurana (https://github.com/priyalkhurana)')
+    st.sidebar.write('Divyansh Kumar(https://github.com/divyanshkr01)')
+    st.sidebar.write("Mitali Chaudhary(https://github.com/Mitali0502)")
+
+
+# Press the green button in the gutter to run the script.
+if __name__ == '_main_':
+
+    # Storing the chat
+    if 'generated' not in st.session_state:
+        st.session_state['generated'] = []
+
+    if 'past' not in st.session_state:
+        st.session_state['past'] = []
+
+    icon = Image.open('gita.jpg')
+
+    #setup page
+    page_setup(pageTitle,icon)
+
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.title("HOLY-GPT")
+    with col2:
+        st.image(icon)
+    #st.write("test 1")
+
+    user_input = get_text()
+
+    print("get_text called.")
+    if user_input:
+        #output = generate_chat_response(user_input)
+        #output = generate_chat_response(user_input)
+        #output=generate_response_chatgpt(user_input)
+        output = generate_response_davinci(user_input)
+        
+        st.write("Bhagvad Gita says: ")
+        # store the output
+        st.session_state.past.append(user_input)
+        st.session_state.generated.append(output)
