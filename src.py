@@ -3,21 +3,28 @@ import numpy as np
 import openai
 import pinecone
 import streamlit as st
+import secrets as secrets
 import time
-# from langchain.llms import OpenAI
-# from langchain.callbacks.base import CallbackManager
-# from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+import os
+import toml
+
+secrets = toml.load('secrets.toml')
+#api_key = secrets['openai.api_key']['pinecone_api_key']
+with open('secrets.toml', 'r') as f:
+    secrets = toml.load(f)
+
+# Get the OpenAI and Pinecone API keys from the secrets dictionary
+openai_api_key = secrets['openai']['openai_api_key']
+pinecone_api_key = secrets['pinecone']['pinecone_api_key']
+
+pinecone.init(api_key=pinecone_api_key, environment='us-west4-gcp')
+
+openai.api_key = openai_api_key
 
 
 
-pinecone_api_key = st.secrets["0549590c-f396-4890-895b-8e98f0c98e3c"]
-pinecone.init(
-    api_key=pinecone_api_key, 
-              environment='us-east1-gcp')
+index_name = 'holygpt'
 
-index_name = 'bhagvad-gita-recovered'
-
-# check if index already exists (it shouldn't if this is first time)
 if index_name not in pinecone.list_indexes():
     # if does not exist, create index
     pinecone.create_index(
@@ -27,16 +34,15 @@ if index_name not in pinecone.list_indexes():
     )
 st.session_state_index = pinecone.Index(index_name)
 
-openai_api_key=st.secrets['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']
 
 
-df_index=pd.read_csv('Data.csv')
+
+df_index=pd.read_csv('only_verses.csv')
 
 st.write("""
 # GitaGPT
 """)
 
-# st.markdown('**:red[The vector database is currently down due to an issue related to the hosting company,Pinecone. Please come back later to try the app.]**')
 
 st.write('''If you could ask Bhagavad Gita a question, what would it be?''')
 st.markdown('\n')
