@@ -36,7 +36,14 @@ def generate_response_davinci(question):
     )
     return response.choices[0].text
 
-
+def generate_response_codex(question):
+    response = openai.Completion.create(
+        model="davinci-codex",
+        prompt=generate_prompt(question),
+        temperature=0.6,
+        max_tokens=2048
+    )
+    return response.choices[0].text
 
 def generate_prompt(question):
      prompt = f"I am here to help you. What is your question or problem? {question}"
@@ -89,7 +96,7 @@ def page_setup(title, icon):
 
 
 # Press the green button in the gutter to run the script.
-if __name__ == '_main_':
+if _name_ == '_main_':
 
     # Storing the chat
     if 'generated' not in st.session_state:
@@ -119,6 +126,7 @@ if __name__ == '_main_':
         #output = generate_chat_response(user_input)
         #output=generate_response_chatgpt(user_input)
         output = generate_response_davinci(user_input)
+        #output=generate_response_codex(user_input)
         
         st.write("Bhagvad Gita says: ")
         # store the output
